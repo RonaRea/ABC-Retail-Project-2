@@ -1,0 +1,57 @@
+[
+  {
+    "partitionKey": "PRODUCT",
+    "rowKey": "4b25fbc70ea94e4b8fbcf516224ceedd",
+    "timestamp": null,
+    "eTag": null,
+    "name": "Wireless Headphones",
+    "category": "Electronics",
+    "price": 899.99,
+    "stock": 42,
+    "imageUrl": ""
+  },
+  {
+    "partitionKey": "PRODUCT",
+    "rowKey": "d6958a6fe27c44009ac48a78916412ef",
+    "timestamp": null,
+    "eTag": null,
+    "name": "Cotton Hoodie",
+    "category": "Clothing",
+    "price": 459,
+    "stock": 65,
+    "imageUrl": ""
+  },
+  {
+    "partitionKey": "PRODUCT",
+    "rowKey": "4525a0fc59114b579287d7a31eab4be7",
+    "timestamp": null,
+    "eTag": null,
+    "name": "Desk Lamp",
+    "category": "Home",
+    "price": 299.5,
+    "stock": 31,
+    "imageUrl": ""
+  },
+  {
+    "partitionKey": "PRODUCT",
+    "rowKey": "280dfb21ba4f41dabe6be4f954263234",
+    "timestamp": null,
+    "eTag": null,
+    "name": "Running Shoes",
+    "category": "Sports",
+    "price": 1199,
+    "stock": 18,
+    "imageUrl": ""
+  },
+  {
+    "partitionKey": "PRODUCT",
+    "rowKey": "83838f889bdf4b469df4f50871356153",
+    "timestamp": null,
+    "eTag": null,
+    "name": "Travel Mug",
+    "category": "Kitchen",
+    "price": 149.99,
+    "stock": 94,
+    "imageUrl": ""
+  }
+]

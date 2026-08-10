@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+.vscode/
+App_Data/*.log
+wwwroot/uploads/
+*.user
+*.suo

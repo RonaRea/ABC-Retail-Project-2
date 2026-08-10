@@ -1,0 +1,52 @@
+[
+  {
+    "partitionKey": "CUSTOMER",
+    "rowKey": "1ac3b4415b8949ab991e8542922ba9f0",
+    "timestamp": null,
+    "eTag": null,
+    "fullName": "Ava Naidoo",
+    "email": "ava.naidoo@gmail.com",
+    "city": "Durban",
+    "loyaltyTier": "Gold"
+  },
+  {
+    "partitionKey": "CUSTOMER",
+    "rowKey": "63d64ee8a8a141bd92ae4ef0bd159169",
+    "timestamp": null,
+    "eTag": null,
+    "fullName": "Thabo Mokoena",
+    "email": "thabo.mokoena@gmail.com",
+    "city": "Johannesburg",
+    "loyaltyTier": "Silver"
+  },
+  {
+    "partitionKey": "CUSTOMER",
+    "rowKey": "484d2a59854342bfae2660de861914ab",
+    "timestamp": null,
+    "eTag": null,
+    "fullName": "Mia Jacobs",
+    "email": "mia.jacobs@gmail.com",
+    "city": "Cape Town",
+    "loyaltyTier": "Standard"
+  },
+  {
+    "partitionKey": "CUSTOMER",
+    "rowKey": "cff6e0147de040799910362067ca720b",
+    "timestamp": null,
+    "eTag": null,
+    "fullName": "Liam Smith",
+    "email": "liam.smith@gmail.com",
+    "city": "Pretoria",
+    "loyaltyTier": "Gold"
+  },
+  {
+    "partitionKey": "CUSTOMER",
+    "rowKey": "8b03c3ca9af14d8e990e585ee7c8b99e",
+    "timestamp": null,
+    "eTag": null,
+    "fullName": "Zara Khan",
+    "email": "zara.khan@gmail.com",
+    "city": "Gqeberha",
+    "loyaltyTier": "Silver"
+  }
+]

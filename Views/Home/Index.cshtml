@@ -1,0 +1,131 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<section class="app-header">
+    <div>
+        <p class="eyebrow">Azure Storage Services</p>
+        <h1>ABC Retail order processing dashboard</h1>
+        <p class="header-copy">Manage customer profiles, products, multimedia, queue messages, and operational logs from one web application.</p>
+    </div>
+    <div class="mode-panel">
+        <span>Storage mode</span>
+        <strong>@Model.StorageMode</strong>
+    </div>
+</section>
+
+@if (TempData["Status"] is string status)
+{
+    <div class="alert alert-success my-3">@status</div>
+}
+
+<section class="metric-grid" id="evidence">
+    <div class="metric"><span>Azure Tables</span><strong>@(Model.Customers.Count + Model.Products.Count)</strong><small>profile and product rows</small></div>
+    <div class="metric"><span>Blob Storage</span><strong>@Model.BlobImages.Count</strong><small>uploaded image files</small></div>
+    <div class="metric"><span>Queue Storage</span><strong>@Model.QueueMessages.Count</strong><small>order/inventory events</small></div>
+    <div class="metric"><span>Azure Files</span><strong>@Model.LogFiles.Count</strong><small>log file records</small></div>
+</section>
+
+<section class="work-grid">
+    <div class="workspace-panel">
+        <h2>Customer Profiles</h2>
+        <form asp-action="AddCustomer" method="post" class="compact-form">
+            <input asp-for="NewCustomer.FullName" name="FullName" placeholder="Full name" class="form-control" />
+            <input asp-for="NewCustomer.Email" name="Email" placeholder="Email address" class="form-control" />
+            <input asp-for="NewCustomer.City" name="City" placeholder="City" class="form-control" />
+            <select asp-for="NewCustomer.LoyaltyTier" name="LoyaltyTier" class="form-select">
+                <option>Standard</option>
+                <option>Silver</option>
+                <option>Gold</option>
+            </select>
+            <button class="btn btn-primary" type="submit">Save Customer</button>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Name</th><th>Email</th><th>City</th><th>Tier</th></tr></thead>
+                <tbody>
+                @foreach (var customer in Model.Customers)
+                {
+                    <tr><td>@customer.FullName</td><td>@customer.Email</td><td>@customer.City</td><td>@customer.LoyaltyTier</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="workspace-panel">
+        <h2>Product Catalogue</h2>
+        <form asp-action="AddProduct" method="post" enctype="multipart/form-data" class="compact-form">
+            <input asp-for="NewProduct.Name" name="Name" placeholder="Product name" class="form-control" />
+            <input asp-for="NewProduct.Category" name="Category" placeholder="Category" class="form-control" />
+            <input asp-for="NewProduct.Price" name="Price" placeholder="Price" class="form-control" />
+            <input asp-for="NewProduct.Stock" name="Stock" placeholder="Stock" class="form-control" />
+            <input type="file" name="image" accept="image/*" class="form-control" />
+            <button class="btn btn-primary" type="submit">Save Product</button>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th></tr></thead>
+                <tbody>
+                @foreach (var product in Model.Products)
+                {
+                    <tr><td>@product.Name</td><td>@product.Category</td><td>@product.Price.ToString("C")</td><td>@product.Stock</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="work-grid">
+    <div class="workspace-panel">
+        <h2>Blob Images</h2>
+        <form asp-action="UploadImage" method="post" enctype="multipart/form-data" class="inline-form">
+            <input type="file" name="image" accept="image/*" class="form-control" />
+            <button class="btn btn-outline-primary" type="submit">Upload</button>
+        </form>
+        <div class="image-grid">
+            @foreach (var image in Model.BlobImages.Take(8))
+            {
+                <a href="@image" target="_blank"><img src="@image" alt="Uploaded product asset" /></a>
+            }
+        </div>
+    </div>
+
+    <div class="workspace-panel">
+        <h2>Order Queue</h2>
+        <form asp-action="QueueOrder" method="post" class="compact-form">
+            <input asp-for="NewOrder.OrderNumber" name="OrderNumber" class="form-control" />
+            <input asp-for="NewOrder.CustomerEmail" name="CustomerEmail" placeholder="Customer email" class="form-control" />
+            <input asp-for="NewOrder.ProductName" name="ProductName" placeholder="Product name" class="form-control" />
+            <input asp-for="NewOrder.Quantity" name="Quantity" class="form-control" />
+            <select asp-for="NewOrder.Status" name="Status" class="form-select">
+                <option>Processing order</option>
+                <option>Updating inventory</option>
+                <option>Dispatch requested</option>
+            </select>
+            <button class="btn btn-outline-primary" type="submit">Queue Event</button>
+        </form>
+        <div class="message-list">
+            @foreach (var message in Model.QueueMessages)
+            {
+                <code>@message</code>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="workspace-panel">
+    <h2>Azure Files Log Evidence</h2>
+    <form asp-action="WriteLog" method="post" class="inline-form">
+        <input name="message" class="form-control" placeholder="Add operational log message" />
+        <button class="btn btn-outline-primary" type="submit">Write Log</button>
+    </form>
+    <div class="log-list">
+        @foreach (var log in Model.LogFiles)
+        {
+            <span>@log</span>
+        }
+    </div>
+</section>
