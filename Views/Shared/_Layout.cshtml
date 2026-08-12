@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/AbcRetail.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body class="d-flex flex-column min-vh-100">
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom mb-0">
             <div class="container-fluid">
@@ -30,7 +30,7 @@
             </div>
         </nav>
     </header>
-    <div class="container-fluid px-4">
+    <div class="container-fluid px-4 flex-grow-1">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>

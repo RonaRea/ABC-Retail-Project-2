@@ -1,6 +1,7 @@
 using AbcRetail.Models;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Azure.Storage.Files.Shares;
 using Azure.Storage.Queues;
 using Microsoft.Extensions.Options;
@@ -10,6 +11,24 @@ namespace AbcRetail.Services;
 
 public class RetailStorageService : IRetailStorageService
 {
+    private static readonly (string ProductName, string FileName)[] SeedImageCatalog =
+    {
+        ("Wireless Headphones", "wireless-headphones.jpg"),
+        ("Cotton Hoodie", "cotton-hoodie.jpg"),
+        ("Desk Lamp", "desk-lamp.jpg"),
+        ("Running Shoes", "running-shoes.jpg"),
+        ("Travel Mug", "travel-mug.jpg")
+    };
+
+    private static readonly string[] LegacySeedImageFiles =
+    {
+        "wireless-headphones.svg",
+        "cotton-hoodie.svg",
+        "desk-lamp.svg",
+        "running-shoes.svg",
+        "travel-mug.svg"
+    };
+
     private readonly StorageOptions _options;
     private readonly IWebHostEnvironment _environment;
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -29,10 +48,12 @@ public class RetailStorageService : IRetailStorageService
 
     public async Task SeedAsync()
     {
+        var productImageUrls = await SeedProductImagesAsync();
+        await SyncSeedProductImageUrlsAsync(productImageUrls);
+
         if (UseAzure)
         {
             await EnsureAzureAsync();
-            await SeedProductImagesAsync();
             if ((await GetCustomersAsync()).Count >= 5 && (await GetProductsAsync()).Count >= 5)
             {
                 return;
@@ -42,7 +63,6 @@ public class RetailStorageService : IRetailStorageService
         {
             Directory.CreateDirectory(LocalDataPath);
             Directory.CreateDirectory(LocalBlobPath);
-            await SeedProductImagesAsync();
             if (File.Exists(Path.Combine(LocalDataPath, "customers.json")) &&
                 File.Exists(Path.Combine(LocalDataPath, "products.json")))
             {
@@ -58,8 +78,6 @@ public class RetailStorageService : IRetailStorageService
             new CustomerProfile { FullName = "Liam Smith", Email = "liam.smith@gmail.com", City = "Pretoria", LoyaltyTier = "Gold" },
             new CustomerProfile { FullName = "Zara Khan", Email = "zara.khan@gmail.com", City = "Gqeberha", LoyaltyTier = "Silver" }
         };
-
-        var productImageUrls = await SeedProductImagesAsync();
 
         var products = new[]
         {
@@ -88,14 +106,20 @@ public class RetailStorageService : IRetailStorageService
     {
         if (!UseAzure)
         {
-            return await ReadLocalAsync<CustomerProfile>("customers.json");
+            return (await ReadLocalAsync<CustomerProfile>("customers.json"))
+                .Where(IsValidCustomer)
+                .OrderBy(customer => customer.FullName)
+                .ToList();
         }
 
         var table = new TableClient(_options.ConnectionString, _options.CustomerTable);
         var rows = new List<CustomerProfile>();
         await foreach (var customer in table.QueryAsync<CustomerProfile>())
         {
-            rows.Add(customer);
+            if (IsValidCustomer(customer))
+            {
+                rows.Add(customer);
+            }
         }
         return rows.OrderBy(customer => customer.FullName).ToList();
     }
@@ -104,14 +128,20 @@ public class RetailStorageService : IRetailStorageService
     {
         if (!UseAzure)
         {
-            return await ReadLocalAsync<ProductItem>("products.json");
+            return (await ReadLocalAsync<ProductItem>("products.json"))
+                .Where(IsValidProduct)
+                .OrderBy(product => product.Name)
+                .ToList();
         }
 
         var table = new TableClient(_options.ConnectionString, _options.ProductTable);
         var rows = new List<ProductItem>();
         await foreach (var product in table.QueryAsync<ProductItem>())
         {
-            rows.Add(product);
+            if (IsValidProduct(product))
+            {
+                rows.Add(product);
+            }
         }
         return rows.OrderBy(product => product.Name).ToList();
     }
@@ -215,7 +245,13 @@ public class RetailStorageService : IRetailStorageService
         await container.CreateIfNotExistsAsync();
         var blob = container.GetBlobClient(fileName);
         await using var stream = image.OpenReadStream();
-        await blob.UploadAsync(stream, overwrite: true);
+        await blob.UploadAsync(stream, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = string.IsNullOrWhiteSpace(image.ContentType) ? "application/octet-stream" : image.ContentType
+            }
+        });
         return blob.Uri.ToString();
     }
 
@@ -271,46 +307,118 @@ public class RetailStorageService : IRetailStorageService
         await file.UploadRangeAsync(new Azure.HttpRange(existing.Value.ContentLength, bytes.Length), stream);
     }
 
-    private async Task<string> SeedImageAsync(string fileName, string color, string label)
+    private async Task<string> SeedImageAsync(string fileName)
     {
-        var svg = $"""
-            <svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640">
-              <rect width="640" height="640" rx="48" fill="#f3f6f8"/>
-              <circle cx="320" cy="270" r="140" fill="{color}"/>
-              <rect x="120" y="430" width="400" height="60" rx="30" fill="#18212f"/>
-              <text x="320" y="468" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#ffffff">{label}</text>
-            </svg>
-            """;
+        var sourcePath = Path.Combine(_environment.WebRootPath, "seed-images", fileName);
+        if (!File.Exists(sourcePath))
+        {
+            throw new FileNotFoundException($"Seed image not found: {sourcePath}", sourcePath);
+        }
 
         if (!UseAzure)
         {
             Directory.CreateDirectory(LocalBlobPath);
             var path = Path.Combine(LocalBlobPath, fileName);
-            if (!File.Exists(path))
-            {
-                await File.WriteAllTextAsync(path, svg);
-            }
+            await using var source = File.OpenRead(sourcePath);
+            await using var target = File.Create(path);
+            await source.CopyToAsync(target);
             return $"/uploads/{fileName}";
         }
 
         var container = new BlobContainerClient(_options.ConnectionString, _options.BlobContainer);
         await container.CreateIfNotExistsAsync();
         var blob = container.GetBlobClient(fileName);
-        await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(svg));
-        await blob.UploadAsync(stream, overwrite: true);
+        await blob.DeleteIfExistsAsync();
+        await using var stream = File.OpenRead(sourcePath);
+        await blob.UploadAsync(stream, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = GetContentType(fileName)
+            }
+        });
         return blob.Uri.ToString();
     }
 
     private async Task<string[]> SeedProductImagesAsync()
     {
-        return
-        [
-            await SeedImageAsync("wireless-headphones.svg", "#1561a5", "Headphones"),
-            await SeedImageAsync("cotton-hoodie.svg", "#7d5a50", "Hoodie"),
-            await SeedImageAsync("desk-lamp.svg", "#d89b28", "Lamp"),
-            await SeedImageAsync("running-shoes.svg", "#2f7d5c", "Shoes"),
-            await SeedImageAsync("travel-mug.svg", "#6b7280", "Mug")
-        ];
+        await DeleteLegacySeedImagesAsync();
+
+        var imageUrls = new List<string>(SeedImageCatalog.Length);
+        foreach (var item in SeedImageCatalog)
+        {
+            imageUrls.Add(await SeedImageAsync(item.FileName));
+        }
+
+        return imageUrls.ToArray();
+    }
+
+    private async Task DeleteLegacySeedImagesAsync()
+    {
+        if (!UseAzure)
+        {
+            Directory.CreateDirectory(LocalBlobPath);
+            foreach (var fileName in LegacySeedImageFiles)
+            {
+                var path = Path.Combine(LocalBlobPath, fileName);
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+
+            return;
+        }
+
+        var container = new BlobContainerClient(_options.ConnectionString, _options.BlobContainer);
+        await container.CreateIfNotExistsAsync();
+        foreach (var fileName in LegacySeedImageFiles)
+        {
+            await container.DeleteBlobIfExistsAsync(fileName);
+        }
+    }
+
+    private async Task SyncSeedProductImageUrlsAsync(IReadOnlyList<string> imageUrls)
+    {
+        if (imageUrls.Count != SeedImageCatalog.Length)
+        {
+            return;
+        }
+
+        var imageMap = SeedImageCatalog
+            .Select((item, index) => new { item.ProductName, ImageUrl = imageUrls[index] })
+            .ToDictionary(item => item.ProductName, item => item.ImageUrl, StringComparer.OrdinalIgnoreCase);
+
+        if (!UseAzure)
+        {
+            var products = (await ReadLocalAsync<ProductItem>("products.json")).ToList();
+            var changed = false;
+            foreach (var product in products)
+            {
+                if (imageMap.TryGetValue(product.Name, out var imageUrl) && product.ImageUrl != imageUrl)
+                {
+                    product.ImageUrl = imageUrl;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                await WriteLocalAsync("products.json", products);
+            }
+
+            return;
+        }
+
+        var table = new TableClient(_options.ConnectionString, _options.ProductTable);
+        await foreach (var product in table.QueryAsync<ProductItem>())
+        {
+            if (imageMap.TryGetValue(product.Name, out var imageUrl) && product.ImageUrl != imageUrl)
+            {
+                product.ImageUrl = imageUrl;
+                await table.UpsertEntityAsync(product);
+            }
+        }
     }
 
     private async Task EnsureAzureAsync()
@@ -335,6 +443,19 @@ public class RetailStorageService : IRetailStorageService
             }
         }
         return files;
+    }
+
+    private static bool IsValidCustomer(CustomerProfile customer)
+    {
+        return !string.IsNullOrWhiteSpace(customer.FullName)
+            && !string.IsNullOrWhiteSpace(customer.Email)
+            && !string.IsNullOrWhiteSpace(customer.City);
+    }
+
+    private static bool IsValidProduct(ProductItem product)
+    {
+        return !string.IsNullOrWhiteSpace(product.Name)
+            && !string.IsNullOrWhiteSpace(product.Category);
     }
 
     private async Task<IReadOnlyList<T>> ReadLocalAsync<T>(string fileName)
@@ -372,5 +493,17 @@ public class RetailStorageService : IRetailStorageService
         {
             _lock.Release();
         }
+    }
+
+    private static string GetContentType(string fileName)
+    {
+        return Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".svg" => "image/svg+xml",
+            _ => "application/octet-stream"
+        };
     }
 }

@@ -8,7 +8,7 @@
     "category": "Electronics",
     "price": 899.99,
     "stock": 42,
-    "imageUrl": ""
+    "imageUrl": "/uploads/wireless-headphones.jpg"
   },
   {
     "partitionKey": "PRODUCT",
@@ -19,7 +19,7 @@
     "category": "Clothing",
     "price": 459,
     "stock": 65,
-    "imageUrl": ""
+    "imageUrl": "/uploads/cotton-hoodie.jpg"
   },
   {
     "partitionKey": "PRODUCT",
@@ -30,7 +30,7 @@
     "category": "Home",
     "price": 299.5,
     "stock": 31,
-    "imageUrl": ""
+    "imageUrl": "/uploads/desk-lamp.jpg"
   },
   {
     "partitionKey": "PRODUCT",
@@ -41,7 +41,7 @@
     "category": "Sports",
     "price": 1199,
     "stock": 18,
-    "imageUrl": ""
+    "imageUrl": "/uploads/running-shoes.jpg"
   },
   {
     "partitionKey": "PRODUCT",
@@ -52,6 +52,6 @@
     "category": "Kitchen",
     "price": 149.99,
     "stock": 94,
-    "imageUrl": ""
+    "imageUrl": "/uploads/travel-mug.jpg"
   }
 ]
