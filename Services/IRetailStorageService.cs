@@ -11,6 +11,8 @@ public interface IRetailStorageService
     Task<IReadOnlyList<string>> GetBlobImagesAsync();
     Task<IReadOnlyList<string>> GetQueueMessagesAsync();
     Task<IReadOnlyList<string>> GetLogFilesAsync();
+    Task<string?> ProcessNextQueueMessageAsync();
+    Task<IReadOnlyList<string>> GetLogEntriesAsync(int maxEntries = 10);
     Task AddCustomerAsync(CustomerProfile customer);
     Task AddProductAsync(ProductItem product);
     Task<string> UploadImageAsync(IFormFile image);

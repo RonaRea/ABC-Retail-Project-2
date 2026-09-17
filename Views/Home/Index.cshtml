@@ -107,6 +107,9 @@
             </select>
             <button class="btn btn-outline-primary" type="submit">Queue Event</button>
         </form>
+        <form asp-action="ProcessQueueMessage" method="post" class="inline-form mt-3">
+            <button class="btn btn-primary" type="submit">Process Next Queue Message</button>
+        </form>
         <div class="message-list">
             @foreach (var message in Model.QueueMessages)
             {
@@ -126,6 +129,12 @@
         @foreach (var log in Model.LogFiles)
         {
             <span>@log</span>
+        }
+    </div>
+    <div class="message-list mt-3">
+        @foreach (var entry in Model.LogEntries)
+        {
+            <code>@entry</code>
         }
     </div>
 </section>

@@ -2,8 +2,10 @@ using AbcRetail.Models;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Files.Shares.Models;
 using Azure.Storage.Files.Shares;
 using Azure.Storage.Queues;
+using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
@@ -170,7 +172,7 @@ public class RetailStorageService : IRetailStorageService
             return await ReadLocalAsync<string>("queue.json");
         }
 
-        var queue = new QueueClient(_options.ConnectionString, _options.QueueName);
+        var queue = CreateQueueClient();
         var messages = await queue.PeekMessagesAsync(maxMessages: 10);
         return messages.Value.Select(message => message.MessageText).ToList();
     }
@@ -185,6 +187,70 @@ public class RetailStorageService : IRetailStorageService
         }
 
         return GetAzureLogFilesAsync();
+    }
+
+    public async Task<string?> ProcessNextQueueMessageAsync()
+    {
+        if (!UseAzure)
+        {
+            var messages = (await ReadLocalAsync<string>("queue.json")).ToList();
+            if (messages.Count == 0)
+            {
+                return null;
+            }
+
+            var message = messages[0];
+            messages.RemoveAt(0);
+            await WriteLocalAsync("queue.json", messages);
+            return message;
+        }
+
+        var queue = CreateQueueClient();
+        await queue.CreateIfNotExistsAsync();
+        var response = await queue.ReceiveMessagesAsync(maxMessages: 1);
+        var messageItem = response.Value.FirstOrDefault();
+        if (messageItem is null)
+        {
+            return null;
+        }
+
+        await queue.DeleteMessageAsync(messageItem.MessageId, messageItem.PopReceipt);
+        return messageItem.MessageText;
+    }
+
+    public async Task<IReadOnlyList<string>> GetLogEntriesAsync(int maxEntries = 10)
+    {
+        if (!UseAzure)
+        {
+            var path = Path.Combine(LocalDataPath, "application.log");
+            if (!File.Exists(path))
+            {
+                return [];
+            }
+
+            return (await File.ReadAllLinesAsync(path))
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .TakeLast(maxEntries)
+                .Reverse()
+                .ToList();
+        }
+
+        var share = new ShareClient(_options.ConnectionString, _options.FileShare);
+        await share.CreateIfNotExistsAsync();
+        var file = share.GetRootDirectoryClient().GetFileClient("application.log");
+        if (!await file.ExistsAsync())
+        {
+            return [];
+        }
+
+        var download = await file.DownloadAsync();
+        using var reader = new StreamReader(download.Value.Content, leaveOpen: false);
+        var content = await reader.ReadToEndAsync();
+        return content
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .TakeLast(maxEntries)
+            .Reverse()
+            .ToList();
     }
 
     public async Task AddCustomerAsync(CustomerProfile customer)
@@ -275,9 +341,9 @@ public class RetailStorageService : IRetailStorageService
             return;
         }
 
-        var queue = new QueueClient(_options.ConnectionString, _options.QueueName);
+        var queue = CreateQueueClient();
         await queue.CreateIfNotExistsAsync();
-        await queue.SendMessageAsync(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(payload)));
+        await queue.SendMessageAsync(payload);
     }
 
     public async Task WriteLogAsync(string message)
@@ -302,7 +368,17 @@ public class RetailStorageService : IRetailStorageService
 
         var existing = await file.GetPropertiesAsync();
         var bytes = System.Text.Encoding.UTF8.GetBytes(line);
-        await file.SetHttpHeadersAsync(existing.Value.ContentLength + bytes.Length, default, default, default, CancellationToken.None);
+        await file.SetHttpHeadersAsync(
+            existing.Value.ContentLength + bytes.Length,
+            new ShareFileHttpHeaders
+            {
+                ContentType = string.IsNullOrWhiteSpace(existing.Value.ContentType)
+                    ? "text/plain"
+                    : existing.Value.ContentType
+            },
+            default,
+            default,
+            CancellationToken.None);
         await using var stream = new MemoryStream(bytes);
         await file.UploadRangeAsync(new Azure.HttpRange(existing.Value.ContentLength, bytes.Length), stream);
     }
@@ -426,8 +502,16 @@ public class RetailStorageService : IRetailStorageService
         await new TableClient(_options.ConnectionString, _options.CustomerTable).CreateIfNotExistsAsync();
         await new TableClient(_options.ConnectionString, _options.ProductTable).CreateIfNotExistsAsync();
         await new BlobContainerClient(_options.ConnectionString, _options.BlobContainer).CreateIfNotExistsAsync();
-        await new QueueClient(_options.ConnectionString, _options.QueueName).CreateIfNotExistsAsync();
+        await CreateQueueClient().CreateIfNotExistsAsync();
         await new ShareClient(_options.ConnectionString, _options.FileShare).CreateIfNotExistsAsync();
+    }
+
+    private QueueClient CreateQueueClient()
+    {
+        return new QueueClient(_options.ConnectionString, _options.QueueName, new QueueClientOptions
+        {
+            MessageEncoding = QueueMessageEncoding.Base64
+        });
     }
 
     private async Task<IReadOnlyList<string>> GetAzureLogFilesAsync()

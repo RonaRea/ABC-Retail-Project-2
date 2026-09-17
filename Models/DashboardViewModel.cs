@@ -7,6 +7,7 @@ public class DashboardViewModel
     public IReadOnlyList<string> BlobImages { get; set; } = [];
     public IReadOnlyList<string> QueueMessages { get; set; } = [];
     public IReadOnlyList<string> LogFiles { get; set; } = [];
+    public IReadOnlyList<string> LogEntries { get; set; } = [];
     public string StorageMode { get; set; } = "Local development";
     public CustomerProfile NewCustomer { get; set; } = new();
     public ProductItem NewProduct { get; set; } = new();

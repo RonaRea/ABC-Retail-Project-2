@@ -85,6 +85,22 @@ public class HomeController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProcessQueueMessage()
+    {
+        var processedMessage = await _storage.ProcessNextQueueMessageAsync();
+        if (string.IsNullOrWhiteSpace(processedMessage))
+        {
+            TempData["Status"] = "No queue messages available to process.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await _storage.WriteLogAsync($"Processed queue transaction: {processedMessage}");
+        TempData["Status"] = "Next queue transaction read and processed successfully.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> WriteLog(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
@@ -111,6 +127,7 @@ public class HomeController : Controller
             BlobImages = await _storage.GetBlobImagesAsync(),
             QueueMessages = await _storage.GetQueueMessagesAsync(),
             LogFiles = await _storage.GetLogFilesAsync(),
+            LogEntries = await _storage.GetLogEntriesAsync(),
             StorageMode = _storage.Mode
         };
     }
